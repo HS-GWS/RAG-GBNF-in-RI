@@ -1,11 +1,13 @@
 #Please note that Argdown was created by Christian Voigt - you may visit the Argdown repository here: https://github.com/christianvoigt/argdown
 #This grammar does not include all the functions that Argdown has to offer and is still a work in progress
 
-root ::= (argument "\n" | statement "\n"){1,}    
+root ::= (argument "\n" | statement "\n"){1,} (contradiction|confirmation){1,}    
 
-statement ::= "[" summary "]"                                
+statement ::= "[" summary "]"
+
+argumentShort ::= "<" title ">"                                  
                                       
-argument ::= "<" title ">" "\n" "\n" "(1.) " premiss "\n" "(2.) " premiss "\n" "(3.) " premiss "\n" "--" "\n" modusponens "\n" "--" "\n" conclusion "\n\n"
+argument ::= "<" title ">" "\n" "\n" "(1.) " premiss "\n" "(2.) " premiss "\n" "(3.) " premiss "\n" "--" "\n" modusponens "\n" "--" "\n" conclusion 
                                                                            
 title ::= [a-zA-Z ]+
                                       
@@ -16,3 +18,7 @@ premiss ::= [a-zA-Z ]+
 conclusion ::= "(4.) " (statement)? [a-zA-Z ]+
                                       
 modusponens ::= [a-zA-Z ]+
+                                      
+contradiction ::= (statement|argument) "\n\t" "-" (statement|argument) "\n"
+                                      
+confirmation ::= (statement|argument) "\n\t" "-" (statement|argument) "\n"
