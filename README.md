@@ -10,4 +10,4 @@ In this repository you find everything you need to locally run a basic streamlit
    or
    ```console python -m streamlit run ri_argument_mapping.py```
 
-This is a work in progress which is highly dependent on packeges that are undergoing rapid changes right now.
+This is a work in progress which is highly dependent on packeges that are undergoing rapid changes right now(Status September 2024).
