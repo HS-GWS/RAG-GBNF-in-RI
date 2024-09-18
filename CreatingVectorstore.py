@@ -1,42 +1,27 @@
+
 import csv
-import faiss
-from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import OllamaEmbeddings
-from langchain_text_splitters import CharacterTextSplitter
-from langchain_community.document_loaders import TextLoader
+from torch import cuda
 from langchain_core.documents import Document
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_chroma import Chroma
+from langchain.embeddings import GPT4AllEmbeddings
 
 
+embed_model = GPT4AllEmbeddings(model_path=r"C:\Academic\RAGPlayground\Models_gguf\all-MiniLM-L6-v2-Q5_K_M.gguf", embedding=True, show_progress_bar=True)
 
-# 1. CSV-Datei einlesen und jede Zeile als Dokument behandeln
+
 def load_csv_as_documents(file_path):
     documents = []
     with open(file_path, newline='', encoding='utf-8') as csvfile:
         reader = csv.reader(csvfile, delimiter='\t')
-        header = next(reader)  
-        n=0
+        header = next(reader)  # Falls es eine Header-Zeile gibt, die überspringen
         for row in reader:
-            n+=1
-            content = f"Das ist der Regestentext: {row[4]}. Dazu kommentiert der Regestenmitarbeiter, der das Regest verfasst hat: {row[7]}"
-            documents.append(Document(page_content=content, metadata={"source": {row[0]}}))
+            content = f"{str(row[4])}"
+            documents.append(Document(page_content=content, metadata={"Identifier": str({row[0]}), "URI": " http://www.regesta-imperii.de/id/"+str({row[30]})}))
     return documents
 
-# CSV-Dateipfad - Hier wird der relative Pfad zur csv-Datei eingesetzt
-csv_file_path = 'RI_05.csv'
 
-# 2. Dokumente aus der CSV-Datei laden
-documents = load_csv_as_documents(csv_file_path)
-
-# 3. Erstellen des TextSplitter und Splitten der Dokumente
-text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
-split_documents = text_splitter.split_documents(documents)
-
-
-# 4. FAISS Vektorstore erstellen
-embeddings = OllamaEmbeddings(model="mxbai-embed-large", show_progress=True)
-db = FAISS.from_documents(documents, embeddings)
-
-# 5. FAISS Vektorstore speichern
-db.save_local(folder_path='RI_05_FAISS')
-
-print("Vektorstore erfolgreich erstellt und gespeichert.")
+documents = load_csv_as_documents("C:\Academic\RAGPlayground\First_Draft\RI_06.csv")
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+all_splits = text_splitter.split_documents(documents)
+vectorstore = Chroma.from_documents(documents=all_splits, embedding=embed_model, persist_directory="Files/Vectorstore/chroma_db")
