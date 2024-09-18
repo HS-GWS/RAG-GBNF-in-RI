@@ -1,7 +1,8 @@
 import os
 import re
+import streamlit as st
 from langchain_chroma import Chroma
-from langchain.embeddings import GPT4AllEmbeddings
+from langchain_community.embeddings import GPT4AllEmbeddings
 from llama_cpp import Llama
 
 # Regular expression to remove HTML tags
@@ -9,58 +10,38 @@ CLEANR = re.compile('<.*?>')
 
 def cleanhtml(raw_html):
     cleantext = re.sub(CLEANR, '', raw_html)
+    print('cleaning html')
     return cleantext
 
-# Cache models to avoid reloading
-class ModelCache:
-    def __init__(self):
-        self.embed_model = None
-        self.llm_model = None
-        self.db = None
-
-    def get_embed_model(self):
-        if self.embed_model is None:
-            # Load embedding model with caching
-            self.embed_model = GPT4AllEmbeddings(model_path=r"C:\Academic\RAGPlayground\Models_gguf\all-MiniLM-L6-v2-Q5_K_M.gguf", embedding=True, show_progress_bar=True)
-        return self.embed_model
-
-    def get_vector_store(self):
-        if self.db is None:
-            embed_model = self.get_embed_model()
-            # Initialize Chroma vectorstore and persist data for caching
-            self.db = Chroma(persist_directory="Files/Vectorstore/chroma_db", embedding_function=embed_model)
-        return self.db
-
-    def get_llm_model(self):
-        if self.llm_model is None:
-            # Load the Llama model once and reuse (caching)
-            self.llm_model = Llama(model_path=r"C:\Academic\RAGPlayground\Models_gguf\Hermes-3-Llama-3.1-8B.Q8_0.gguf", gpu_layers=28, n_ctx=4196, show_progress_bar=True)
-        return self.llm_model
-
-# Initialize the model cache (for caching models)
-model_cache = ModelCache()
-
-# Load LLM model
 def load_llm():
-    return model_cache.get_llm_model()
+    llm = Llama(model_path=r"C:\Academic\RAGPlayground\Models_gguf\qwen2-7b-instruct-q2_k.gguf", n_ctx=4196)
+    print('model loaded')
+    return llm
 
-# Retrieve relevant documents from the vector store based on user_input
+# Retrieve relevant documents from the vector store based on the question
 def get_documents_from_question(question):
-    db = model_cache.get_vector_store()
+    embed_model = GPT4AllEmbeddings(model_path=r"C:\Academic\RAGPlayground\Models_gguf\all-MiniLM-L6-v2-Q5_K_M.gguf", embedding=True, show_progress_bar=True)
+    db = Chroma(persist_directory=r"C:\Academic\RAGPlayground\Second_Draft\Files\Vectorstore", embedding_function=embed_model) 
     docs = db.similarity_search(question, k=3)
+    print('loaded vectorbase')
     return docs
 
 # Process documents to extract arguments using the LLM
 def get_arguments_from_question(question, documents, llm):
     arguments = []
+    n = 0
+    print(n)
+    print(documents)
     for i in documents:
+        n+=1
         prompt = f"""
         Bitte schreibe keine Hinleitung oder abschließendes Kommentar. In Hinsicht auf die Frage: {question}, 
         finde in folgendem Regest alle Argumentationen und gebe diese als Liste aus, 
         die Argumentationen in der Liste sollen jeweils aus einem aussagekräftigen Titel als Überschrift und ein Beschreibung der Argumentation als Fließtext bestehen: {cleanhtml(i.page_content)}
         """
-        output = llm(prompt=prompt, max_tokens=500)
-        arguments.append(f"[{i.metadata['Identifier']}]({i.metadata['URI']})\n\n{output['choices'][0]['text']}")
+        output = llm(prompt=prompt, temperature=0.5, max_tokens=400)
+        arguments.append(f"[{str(i.metadata['Identifier']).strip()}]({str(i.metadata['URI']).strip()})\n\n{output['choices'][0]['text']}")
+        print('added arguments_'+'n')
     return arguments
 
 # Save the extracted arguments to files
@@ -73,24 +54,36 @@ def save_strings_to_files(strings_list, output_dir):
 
         with open(file_path, 'w', encoding='utf-8') as file:
             file.write(string)
-        print(f"Saved string to {file_path}")
+        st.write(f"Saved string to {file_path}")
 
-# Main function to run the app
+# Streamlit App Interface
 def main():
-    question = 'Warum werden Privilegien wiederufen bzw. entzogen?'
+    st.title("Argument Mining in den RI")
     
-    # Get relevant documents
-    documents = get_documents_from_question(question)
+    # Input question from user
+    question = st.text_input("Geben Sie eine Frage ein:", "")
     
-    # Load the cached LLM model
-    llm = load_llm()
-    
-    # Extract arguments from the documents
-    arguments = get_arguments_from_question(question, documents, llm)
-    
-    # Save the arguments to files
-    save_strings_to_files(arguments, 'Files/Arguments')
+    if st.button("Argumente generieren"):
+        if question:
+            # Get relevant documents
+            documents = get_documents_from_question(question)
+            
+            # Load the cached LLM model
+            llm = load_llm()
+            
+            # Extract arguments from the documents
+            arguments = get_arguments_from_question(question, documents, llm)
+            print(arguments)            
+            # Display arguments in the Streamlit app
+            st.write("### Gefundene Argumente:")
+            for i, arg in enumerate(arguments):
+                st.write(f"**Argument {i + 1}:**\n{arg}\n")
+            
+            # Save the arguments to files
+            save_strings_to_files(arguments, 'Files/Arguments')
+        else:
+            st.warning("Please enter a question.")
 
-# Run the app
+# Run the Streamlit app
 if __name__ == "__main__":
     main()
